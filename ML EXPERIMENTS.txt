@@ -1,0 +1,739 @@
+                         ML EXPERIMENTS
+
+
+Experiment-1:
+
+Implement and demonstrate the FIND-S algorithm for finding the most specific 
+hypothesis based on a given set of training data samples. Read the training data from a 
+.CSV file.
+
+
+PROGRAM:
+
+import pandas as pd
+import numpy as np
+# Load the CSV file
+data = pd.read_csv('data.csv')
+# Extract the attributes (concepts) and target values
+concepts = np.array(data)[:,:-1]
+target = np.array(data)[:,-1]
+print("\nConcepts:")
+print(concepts)
+print("\nTarget:")
+print(target)
+# Function to implement FIND-S algorithm with hypothesis printing at each step
+def train(con, tar):
+ # Initialize the specific hypothesis with the first positive example
+ for i, val in enumerate(tar):
+     if val == 'yes':
+         specific_h = con[i].copy()
+         print(f"\nInitial hypothesis from first positive example: {specific_h}")
+         break
+ for i, val in enumerate(con):
+     if tar[i] == 'yes':
+         for x in range(len(specific_h)):
+             if val[x] != specific_h[x]:
+                 specific_h[x] = '?'
+         print(f"\nHypothesis after example {i+1}: {specific_h}")
+ return specific_h
+# Apply the FIND-S algorithm to the data
+specific_hypothesis = train(concepts, target)
+# Display the most specific hypothesis
+print("\nThe most specific hypothesis is:", specific_hypothesis)
+
+
+
+
+Experiment-2:
+
+For a given set of training data examples stored in a .CSV file, implement and 
+demonstrate the Candidate Elimination algorithm to output a description of the set of all 
+hypotheses consistent with the training examples.
+
+PROGRAM:
+
+import numpy as np 
+import pandas as pd
+
+# Load the dataset from a CSV file
+data = pd.read_csv('data.csv')
+
+# Extract the concepts (features) and target (labels)
+concepts = np.array(data.iloc[:, 0:-1])
+target = np.array(data.iloc[:, -1])
+
+# Function to learn the concept using the Candidate Elimination algorithm
+def learn(concepts, target):
+    # Initialize specific hypothesis as the first positive instance
+    specific_h = concepts[0].copy()
+    print("Initialization of specific_h \n", specific_h)
+    
+    # Initialize general hypothesis to the most general hypothesis
+    general_h = [["?" for i in range(len(specific_h))] for i in range(len(specific_h))]
+    print("Initialization of general_h \n", general_h)
+    
+    # Iterate through all instances
+    for i, h in enumerate(concepts):
+        if target[i] == "yes":
+            print(f"Instance {i+1} is Positive")
+            # Update specific hypothesis for positive instance
+            for x in range(len(specific_h)):
+                if h[x] != specific_h[x]:
+                    specific_h[x] = '?'  # Generalize the hypothesis
+                    general_h[x][x] = '?'
+        elif target[i] == "no":
+            print(f"Instance {i+1} is Negative")
+            # Update general hypothesis for negative instance
+            for x in range(len(specific_h)):
+                if h[x] != specific_h[x]:
+                    general_h[x][x] = specific_h[x]
+                else:
+                    general_h[x][x] = '?'
+        
+        # Print the intermediate steps
+        print(f"Step {i + 1}")
+        print("Specific Hypothesis:", specific_h)
+        print("General Hypothesis:", general_h)
+        print("\n")
+    
+    # Remove redundant hypotheses from the general hypothesis
+    general_h = [h for h in general_h if h != ['?' for _ in range(len(specific_h))]]
+    
+    return specific_h, general_h
+
+# Run the learning algorithm
+s_final, g_final = learn(concepts, target)
+
+# Output the final specific and general hypotheses
+print("Final Specific_h:", s_final, sep="\n")
+print("Final General_h:", g_final, sep="\n")
+
+
+
+
+Experiment-3:
+
+Write a program to demonstrate the working of the decision tree based ID3 algorithm. 
+Use an appropriate data set for building the decision tree and apply this knowledge to 
+classify a new sample.
+
+PROGRAM:
+
+import pandas as pd
+from pprint import pprint
+from sklearn.feature_selection import mutual_info_classif
+from collections import Counter
+
+# ID3 algorithm implementation
+def id3(df, target_attribute, attribute_names, default_class=None):
+    cnt = Counter(x for x in df[target_attribute])
+
+    # If the target attribute has only one unique value, return that value
+    if len(cnt) == 1:
+        return next(iter(cnt))
+
+    # If the dataset is empty or attribute_names list is empty, return the default class
+    elif df.empty or (not attribute_names):
+        return default_class
+
+    else:
+        # Calculate information gain for each attribute
+        gainz = mutual_info_classif(df[attribute_names], df[target_attribute], 
+                                    discrete_features=True)
+        index_of_max = gainz.tolist().index(max(gainz))
+        best_attr = attribute_names[index_of_max]
+
+        # Create a new decision tree node with the best attribute
+        tree = {best_attr: {}}
+
+        # Remove the best attribute from the list of attributes
+        remaining_attribute_names = [i for i in attribute_names if i != best_attr]
+
+        # Recursively create subtrees for each value of the best attribute
+        for attr_val, data_subset in df.groupby(best_attr):
+            subtree = id3(data_subset, target_attribute, remaining_attribute_names, default_class)
+            tree[best_attr][attr_val] = subtree
+
+        return tree
+
+# Function to classify a new sample
+def classify(tree, sample):
+    if not isinstance(tree, dict):
+        return tree
+    attr = next(iter(tree))
+    if sample[attr] in tree[attr]:
+        return classify(tree[attr][sample[attr]], sample)
+    else:
+        return None
+
+# Create the dataset from the provided data
+data = {
+    "Outlook": ["Sunny", "Sunny", "Overcast", "Rain", "Rain", "Rain", "Overcast", "Sunny", 
+                "Sunny", "Rain", "Sunny", "Overcast", "Overcast"],
+    "Temperature": ["Hot", "Hot", "Hot", "Mild", "Mild", "Mild", "Mild", "Hot", "Mild", 
+                    "Mild", "Overcast", "Hot", "Hot"],
+    "Humidity": ["High", "High", "High", "High", "Normal", "Normal", "Normal", "Normal", 
+                 "High", "High", "High", "Normal", "High"],
+    "Windy": ["FALSE", "TRUE", "FALSE", "FALSE", "FALSE", "TRUE", "TRUE", 
+              "FALSE", "FALSE", "TRUE", "TRUE", "FALSE", "TRUE"],
+    "PlayTennis": ["No", "No", "Yes", "Yes", "Yes", "No", "Yes", "No", "Yes", "No", "Yes", 
+                   "Yes", "Yes"]
+}
+df = pd.DataFrame(data)
+
+# Extract attribute names and remove the target attribute
+attribute_names = df.columns.tolist()
+attribute_names.remove("PlayTennis")
+
+# Factorize categorical columns and store the mappings
+factor_mappings = {}
+for colname in df.select_dtypes("object"):
+    df[colname], mapping = df[colname].factorize()
+    factor_mappings[colname] = mapping
+
+# Print the factorized dataset
+print("Factorized dataset:")
+print(df)
+
+# Build the ID3 decision tree
+tree = id3(df, "PlayTennis", attribute_names)
+
+# Print the resulting tree structure
+print("The tree structure:")
+pprint(tree)
+
+# Define a new sample to classify
+new_sample = {
+    "Outlook": "Sunny",
+    "Temperature": "Hot",
+    "Humidity": "High",
+    "Windy": "FALSE"
+}
+
+# Factorize the new sample based on the existing factor mappings
+for colname in new_sample:
+    new_sample[colname] = factor_mappings[colname].tolist().index(new_sample[colname])
+
+# Classify the new sample
+classification = classify(tree, new_sample)
+print(f"The classification for the new sample is: {'Yes' if classification == 1 else 'No' if classification == 0 else 'Unknown'}")
+
+
+
+EXPERIMENT-4
+
+Exercises to solve the real-world problems using the following machine learning methods: 
+a) Linear Regression b) Logistic Regression 
+Aim: To solve the real-world problems using the following machine learning methods: a) 
+Linear Regression b) Logistic Regression
+
+
+simple linear Regression:
+
+
+# Importing the necessary libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Load the dataset
+dataset = pd.read_csv('Salary_Data.csv')
+
+# Display the first few rows of the dataset
+dataset.head()
+
+# Data preprocessing
+X = dataset.iloc[:, :-1].values  # Independent variable (Years of experience)
+y = dataset.iloc[:, 1].values    # Dependent variable (Salary)
+
+# Splitting the dataset into training and testing sets
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1/3, random_state=0)
+
+# Fitting the Linear Regression model to the training set
+from sklearn.linear_model import LinearRegression
+regressor = LinearRegression()
+regressor.fit(X_train, y_train)  # Producing the linear equation for the data
+
+# Predicting the test set results
+y_pred = regressor.predict(X_test)
+
+# Visualizing the training set results
+plt.scatter(X_train, y_train, color='red')  # Plotting the observation points
+plt.plot(X_train, regressor.predict(X_train), color='blue')  # Plotting the regression line
+plt.title("Salary vs Experience (Training set)")  # Title of the graph
+plt.xlabel("Years of Experience")  # X-axis label
+plt.ylabel("Salary")  # Y-axis label
+plt.show()
+
+# Visualizing the test set results
+plt.scatter(X_test, y_test, color='red')  # Plotting the actual test observations
+plt.plot(X_train, regressor.predict(X_train), color='blue')  # Regression line (from training data)
+plt.title("Salary vs Experience (Test set)")  # Title of the graph
+plt.xlabel("Years of Experience")  # X-axis label
+plt.ylabel("Salary")  # Y-axis label
+plt.show()
+
+
+multilinear Regression
+
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+# Load your dataset
+data = pd.read_csv('multiple_linear_regression_dataset.csv')
+# Prepare the input (X) and output (y) variables
+X = data[['age', 'experience']]
+y = data['income']
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Create and train the model
+model = LinearRegression()
+model.fit(X_train, y_train)
+# Make predictions
+y_pred = model.predict(X_test)
+# Evaluate the model
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+print(f"Mean Squared Error: {mse}")
+print(f"R-squared: {r2}")
+print("Coefficients:", model.coef_)
+print("Intercept:", model.intercept_)
+
+
+logistic Regression
+
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+data = pd.DataFrame({
+ 'X1': [1, 2, 3, 4, 5, 6],
+ 'X2': [2, 3, 4, 5, 6, 7],
+ 'Y': [0, 0, 0, 1, 1, 1]
+})
+X = data[['X1', 'X2']]
+y = data['Y']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+model = GaussianNB()
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+conf_matrix = confusion_matrix(y_test, y_pred)
+class_report = classification_report(y_test, y_pred)
+print(f"Accuracy: {accuracy}")
+print("Confusion Matrix:")
+print(conf_matrix)
+print("Classification Report:")
+print(class_report)
+
+
+
+Experiment-5
+Develop a program for Bias, Variance, Remove duplicates, Cross Validation
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+
+# 1. Importing the dataset
+dataset = pd.read_csv('Salary_Data.csv')
+
+# Remove duplicates from the dataset
+dataset = dataset.drop_duplicates()
+
+# 2. Data Preprocessing
+X = dataset.iloc[:, :-1].values  # Independent variable array (Years of Experience)
+y = dataset.iloc[:, 1].values    # Dependent variable vector (Salary)
+
+# 3. Splitting the dataset into the training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1/3, random_state=0)
+
+# 4. Fitting the regression model
+regressor = LinearRegression()
+regressor.fit(X_train, y_train)  # Fit the model
+
+# 5. Predicting the test set results
+y_pred = regressor.predict(X_test)
+
+# 6. Calculate Bias
+def calculate_bias(y_test, y_pred):
+    return np.mean(y_pred - y_test)
+
+# 7. Calculate Variance
+def calculate_variance(y_pred):
+    return np.var(y_pred)
+
+# 8. Cross-Validation with Bias and Variance Calculation
+def cross_validation(model, X, y, cv=5):
+    kf = KFold(n_splits=cv, shuffle=True, random_state=0)
+    biases, variances, mse_scores = [], [], []
+    
+    for train_idx, test_idx in kf.split(X):
+        X_train, X_test = X[train_idx], X[test_idx]
+        y_train, y_test = y[train_idx], y[test_idx]
+        
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+        
+        biases.append(calculate_bias(y_test, y_pred))
+        variances.append(calculate_variance(y_pred))
+        mse_scores.append(mean_squared_error(y_test, y_pred))
+    
+    return np.mean(biases), np.mean(variances), np.mean(mse_scores)
+
+# Example: Cross-validation on the model
+avg_bias, avg_variance, avg_mse = cross_validation(regressor, X, y)
+
+# Output the results
+print("Bias on Test Set:", calculate_bias(y_test, y_pred))
+print("Variance on Test Set:", calculate_variance(y_pred))
+print("Average Bias across CV:", avg_bias)
+print("Average Variance across CV:", avg_variance)
+print("Average MSE across CV:", avg_mse)
+
+# 9. Visualizing the training set results (optional)
+plt.scatter(X_train, y_train, color='red')  # Scatter plot of training data
+plt.plot(X_train, regressor.predict(X_train), color='blue')  # Regression line
+plt.title('Salary vs Experience (Training set)')
+plt.xlabel('Years of Experience')
+plt.ylabel('Salary')
+plt.show()
+
+# 10. Visualizing the test set results (optional)
+plt.scatter(X_test, y_test, color='red')  # Scatter plot of test data
+plt.plot(X_train, regressor.predict(X_train), color='blue')  # Regression line from training set
+plt.title('Salary vs Experience (Test set)')
+plt.xlabel('Years of Experience')
+plt.ylabel('Salary')
+plt.show()
+
+
+
+Experiment-6
+Write a program to implement Categorical Encoding, One-hot Encoding
+
+
+categorical encoding
+
+from sklearn.preprocessing import LabelEncoder
+# Create a sample dataset
+fruits = ['Apple', 'Orange', 'Banana', 'Carrot', 'Tomato', 'Potato']
+fruit_types = ['Fruit', 'Fruit', 'Fruit', 'Vegetable', 'Vegetable', 'Vegetable']
+# Create a LabelEncoder object
+le = LabelEncoder()
+# Fit and transform the categorical data
+encoded_types = le.fit_transform(fruit_types)
+# Print the original and encoded data
+print('Original Data:', fruit_types)
+print('Encoded Data:', encoded_types)
+
+
+one-hot encoding
+
+
+from sklearn.preprocessing import OneHotEncoder
+import numpy as np
+# Sample data
+data = np.array(['red', 'blue', 'green', 'blue', 'red']).reshape(-1, 1)
+# Initialize OneHotEncoder
+onehot_encoder = OneHotEncoder(sparse=False)
+# Fit and transform the data
+encoded_data = onehot_encoder.fit_transform(data)
+print(encoded_data)
+
+
+
+
+EXPERIMENT-7
+
+Write a program to implement k-Nearest Neighbor algorithm to classify the iris data 
+set. Print both correct and wrong predictions
+
+
+import numpy as np
+import pandas as pd
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn import metrics
+from sklearn.preprocessing import LabelEncoder
+
+# Load the dataset
+dataset = pd.read_csv("iris.csv")
+
+# Features and target columns
+X = dataset[['sepal.length', 'sepal.width', 'petal.length', 'petal.width']]  # Features
+y = dataset['variety']  # Target (class labels)
+
+# Convert the categorical target 'variety' into numeric values using LabelEncoder
+le = LabelEncoder()
+y_encoded = le.fit_transform(y)
+
+# Split the dataset into training and testing sets
+Xtrain, Xtest, ytrain, ytest = train_test_split(X, y_encoded, test_size=0.10, random_state=42)
+
+# Create and train the K-Nearest Neighbors (KNN) classifier
+classifier = KNeighborsClassifier(n_neighbors=5).fit(Xtrain, ytrain)
+
+# Predict the labels for the test set
+ypred = classifier.predict(Xtest)
+
+# Initialize a counter for indexing
+i = 0
+print("\n-------------------------------------------------------------------------")
+print('%-25s %-25s %-25s' % ('Original Label', 'Predicted Label', 'Correct/Wrong'))
+print("-------------------------------------------------------------------------")
+
+# Compare each original label with its prediction and print the results
+for label, prediction in zip(ytest, ypred):
+    print('%-25s %-25s' % (le.inverse_transform([label])[0], le.inverse_transform([prediction])[0]), end="")
+    if label == prediction:
+        print('%-25s' % ('Correct'))
+    else:
+        print('%-25s' % ('Wrong'))
+    i += 1
+
+print("-------------------------------------------------------------------------")
+
+# Display the confusion matrix
+print("\nConfusion Matrix:\n", metrics.confusion_matrix(ytest, ypred))
+print("-------------------------------------------------------------------------")
+
+# Display the classification report with precision, recall, and F1-score
+print("\nClassification Report:\n", metrics.classification_report(ytest, ypred, target_names=le.classes_))
+print("-------------------------------------------------------------------------")
+
+# Display the accuracy of the classifier
+print('Accuracy of the classifier is %0.2f' % metrics.accuracy_score(ytest, ypred))
+print("-------------------------------------------------------------------------")
+
+
+EXPERIMENT-8
+Write a program to implement k-Means algorithm
+
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+import matplotlib.pyplot as plt
+from sklearn.datasets import make_blobs
+
+# Step 2: Generate Sample Dataset
+# For demonstration, create a synthetic dataset with 4 centers (blobs)
+data, labels = make_blobs(n_samples=300, n_features=2, centers=4, random_state=42)
+
+# Convert the data into a Pandas DataFrame for easier viewing (optional)
+df = pd.DataFrame(data, columns=['Feature 1', 'Feature 2'])
+# View the first 5 rows of the generated data (optional)
+print(df.head())
+
+# Create a dataset with 3 clusters
+X, _ = make_blobs(n_samples=300, centers=3, cluster_std=0.60, random_state=0)
+
+# Step 3: Split Dataset into Training and Testing Sets
+X_train, X_test = train_test_split(X, test_size=0.2, random_state=42)
+
+# Step 4: Fit the KMeans Model
+kmeans = KMeans(n_clusters=3, random_state=42)
+kmeans.fit(X_train)
+
+# Step 5: Predict the Model
+y_train_pred = kmeans.predict(X_train)
+y_test_pred = kmeans.predict(X_test)
+
+# Step 6: Metrics
+# Calculate silhouette score for both training and testing sets
+train_silhouette = silhouette_score(X_train, y_train_pred)
+test_silhouette = silhouette_score(X_test, y_test_pred)
+
+# Print silhouette scores
+print(f"Training Silhouette Score: {train_silhouette:.2f}")
+print(f"Testing Silhouette Score: {test_silhouette:.2f}")
+
+# Step 7: Plotting the Clusters
+plt.scatter(X_train[:, 0], X_train[:, 1], c=y_train_pred, s=50, cmap='viridis', label='Training Data')
+plt.scatter(X_test[:, 0], X_test[:, 1], c=y_test_pred, s=50, cmap='plasma', label='Testing Data', alpha=0.5)
+plt.scatter(kmeans.cluster_centers_[:, 0], kmeans.cluster_centers_[:, 1], s=300, c='red', label='Centroids')
+
+plt.title('K-means Clustering')
+plt.legend()
+plt.show()
+
+
+
+Experiment-9
+Exploratory Data Analysis for Classification using Pandas or Matplotlib.
+Aim: Exploratory Data Analysis for Classification using Pandas or Matplotlib.
+
+
+# Step 1: Importing Required Libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings as wr
+
+# Ignore warnings
+wr.filterwarnings('ignore')
+
+# Step 2: Reading Dataset
+df = pd.read_csv("winequality-red.csv")
+print(df.head())
+
+# Step 3: Analyzing the Data
+
+# 3.1 Shape of the data
+print("Shape of the data:", df.shape)
+
+# 3.2 Data information
+df.info()
+
+# 3.3 Describing the data
+print(df.describe())
+
+# 3.4 Checking column names
+print("Columns in the dataset:", df.columns.tolist())
+
+# 3.5 Checking for missing values
+print("Missing values in each column:\n", df.isnull().sum())
+
+# 3.6 Checking for duplicate values (unique values in each column)
+print("Unique values in each column:\n", df.nunique())
+
+# Step 4: Univariate Analysis
+
+# Count plot for 'quality' column
+quality_counts = df['quality'].value_counts()
+
+# Using Matplotlib to create a count plot
+plt.figure(figsize=(8, 6))
+plt.bar(quality_counts.index, quality_counts, color='pink')  # Use a recognized color
+plt.title('Count Plot of Quality')
+plt.xlabel('Quality')
+plt.ylabel('Count')
+plt.xticks(quality_counts.index)  # Ensure x-ticks match quality levels
+plt.show()
+
+# Step 5: Bivariate Analysis
+
+# Set the color palette for Seaborn
+sns.set_palette("Pastel1")
+
+# Create a pair plot for the dataset
+plt.figure(figsize=(10, 6))
+sns.pairplot(df)
+plt.suptitle('Pair Plot for DataFrame', y=1.02)
+plt.show()
+
+# Box Plot between 'alcohol' and 'quality'
+plt.figure(figsize=(8, 6))
+sns.boxplot(x='quality', y='alcohol', data=df)
+plt.title('Box Plot between Alcohol and Quality')
+plt.xlabel('Quality')
+plt.ylabel('Alcohol')
+plt.show()
+
+# Step 6: Multivariate Analysis
+
+# Create a heatmap to visualize correlation between variables
+plt.figure(figsize=(15, 10))
+sns.heatmap(df.corr(), annot=True, fmt='.2f', cmap='Pastel2', linewidths=2)
+plt.title('Correlation Heatmap')
+plt.show()
+
+
+Experiment-10
+Write a program to Implement Support Vector Machines
+
+
+# Step 1: Import necessary libraries
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn import datasets
+
+# Step 2: Load the Iris dataset
+iris = datasets.load_iris()
+X = iris.data  # Features
+y = iris.target  # Labels
+
+# Step 3: Split the dataset into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# Step 4: Initialize and fit the SVM model
+svm_model = SVC(kernel='linear', C=1.0)
+svm_model.fit(X_train, y_train)
+
+# Step 5: Make predictions on the test data
+y_pred = svm_model.predict(X_test)
+
+# Step 6: Display results
+# Calculate and print the accuracy
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy:", accuracy)
+
+# Print the classification report
+print("\nClassification Report:\n", classification_report(y_test, y_pred))
+
+# Generate and print the confusion matrix
+conf_matrix = confusion_matrix(y_test, y_pred)
+print("\nConfusion Matrix:\n", conf_matrix)
+
+
+Experiment-11
+Write a program to Implement Principle Component Analysis
+
+
+#PCA:
+import numpy as np
+import pandas as pd
+from sklearn.decomposition import PCA
+X=np.array([[-1,1],[-2,-1],[-3,-2],[1,1],[2,1],[3,2]])
+pca=PCA(n_components=2)
+pca.fit(X)
+print(pca.explained_variance_ratio_)
+print(pca.singular_values_)
+
+
+
+#Randomized_PCA:
+import numpy as np
+import pandas as pd
+from sklearn.decomposition import PCA
+X=np.array([[-1,1],[-2,-1],[-3,-2],[1,1],[2,1],[3,2]])
+pca=PCA(n_components=2, svd_solver='randomized')
+pca.fit(X)
+print(pca.explained_variance_ratio_)
+print(pca.singular_values_)
+
+
+
+# Kernel PCA
+import numpy as np
+import pandas as pd
+from sklearn.decomposition import KernelPCA
+
+# Sample data
+X = np.array([[-1, 1], [-2, -1], [-3, -2], [1, 1], [2, 1], [3, 2]])
+
+# Initialize KernelPCA
+pca = KernelPCA(n_components=2, kernel="rbf", gamma=0.04)
+
+# Fit and transform the data
+X_reduced = pca.fit_transform(X)
+
+# Print the reduced dataset
+print(X_reduced)
